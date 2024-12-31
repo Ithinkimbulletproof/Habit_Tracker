@@ -1,54 +1,81 @@
-from django.contrib.auth.models import AbstractUser
-from django.db import models
-from django.core.exceptions import ValidationError
+from datetime import timedelta
 
-class CustomUser(AbstractUser):
-    telegram_id = models.CharField(max_length=255, blank=True, null=True, help_text="Telegram ID пользователя.")
+from django.core.validators import MaxValueValidator
+from django.db import models
+
+from users.models import User
+
+NULLABLE = {"null": True, "blank": True}
+
 
 class Habit(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="habits")
-    place = models.CharField(max_length=255, help_text="Место выполнения привычки.")
-    time = models.TimeField(help_text="Время выполнения привычки.")
-    action = models.CharField(max_length=255, help_text="Действие привычки.")
-    pleasant_habit = models.BooleanField(default=False, help_text="Приятная привычка.")
+    """
+    Модель привычки
+    """
+    habit = models.CharField(
+        max_length=255,
+        verbose_name="Привычка",
+    )
+    place_of_execution = models.CharField(
+        max_length=255, verbose_name="Место где нужно выполнять привычку",
+        **NULLABLE
+    )
+    time_execution = models.TimeField(
+        verbose_name="Время когда выполняется привычка",
+        **NULLABLE
+    )
+    periodicity = models.PositiveSmallIntegerField(
+        validators=[MaxValueValidator(7)],
+        verbose_name="Периодичность привычки",
+        default=1
+    )
+    time_to_complete = models.DurationField(
+        default=timedelta(seconds=120),
+        verbose_name="Продолжительность выполнения привычки по времени",
+    )
+    sign_of_a_pleasant_habit = models.BooleanField(
+        verbose_name="Показатель приятной привычки",
+        default=False
+    )
     related_habit = models.ForeignKey(
         "self",
         on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="related_to",
-        help_text="Связанная привычка (только для полезных привычек).",
-    )
-    periodicity = models.PositiveIntegerField(
-        default=7, help_text="Периодичность выполнения привычки в днях."
+        verbose_name="Связанная приятная привычка",
+        **NULLABLE,
+        related_name="related_habits"
     )
     reward = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        help_text="Вознаграждение за выполнение привычки.",
+        verbose_name="Вознаграждение за привычку",
+        **NULLABLE
     )
-    execution_time = models.PositiveIntegerField(
-        help_text="Время на выполнение в секундах."
+
+    STATUS_PUBLISHED = [
+        ("Опубликован", "Опубликован"),
+        ("Не опубликован", "Не опубликован"),
+    ]
+    published = models.CharField(
+        max_length=50,
+        choices=STATUS_PUBLISHED,
+        default="Не опубликован",
+        verbose_name="Статус опубликования привычки",
     )
-    is_public = models.BooleanField(default=False, help_text="Привычка доступна всем.")
+    owner = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        verbose_name="Создатель привычки",
+        related_name="users_habits",
+        **NULLABLE
+    )
+    send_indicator = models.PositiveSmallIntegerField(
+        editable=False,
+        verbose_name="Индикатор отправки",
+        **NULLABLE
+    )
 
-    def clean(self):
-        if self.reward and self.related_habit:
-            raise ValidationError(
-                "Выберите либо вознаграждение, либо связанную привычку, но не оба варианта."
-            )
-
-        if self.execution_time > 120:
-            raise ValidationError("Время выполнения не может быть больше 120 секунд.")
-
-        if self.related_habit and not self.related_habit.pleasant_habit:
-            raise ValidationError("Связанная привычка должна быть приятной.")
-
-        if self.periodicity < 7:
-            raise ValidationError(
-                "Периодичность выполнения не может быть меньше 7 дней."
-            )
+    class Meta:
+        verbose_name = "Привычка"
+        verbose_name_plural = "Привычки"
+        ordering = ("id",)
 
     def __str__(self):
-        return f"{self.action} ({'Приятная' if self.pleasant_habit else 'Полезная'})"
+        return self.habit

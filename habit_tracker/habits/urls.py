@@ -1,15 +1,14 @@
-from django.urls import path, include
+from django.urls import path
 from rest_framework.routers import DefaultRouter
-from .views import HabitViewSet, PublicHabitListView, UserCreateView
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from habits.apps import HabitsConfig
+from habits.views import HabitsViewSet, UserHabitViewSet, PublishedHabitListAPIView
+
+app_name = HabitsConfig.name
 
 router = DefaultRouter()
-router.register('habits', HabitViewSet, basename='habit')
+router.register(r"habits", HabitsViewSet, basename="habits")
 
 urlpatterns = [
-    path('api/', include(router.urls)),
-    path('api/public-habits/', PublicHabitListView.as_view(), name='public-habits'),
-    path('api/register/', UserCreateView.as_view(), name='register'),
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-]
+    path("user-habits-list/", UserHabitViewSet.as_view(), name="user_habits_list"),
+    path("user-habits-list-published/", PublishedHabitListAPIView.as_view(), name="user_habits_list_published"),
+] + router.urls
